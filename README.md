@@ -88,6 +88,15 @@ Co-op uses UDP port 27870.
 | `B2recomp/runtime/` | The Archipelago client (`ap_*.c`) and story co-op (`coop_*.c`) |
 | `B2recomp/scripts/ap_patch.py` | Hooks the game's code to the runtime after it is translated |
 
+## AI usage
+
+This project was made with heavy use of AI. Most of the Archipelago and co-op code, the apworld, the research into the
+game's internals (`ap/NOTES.md`) and this documentation were written by Claude, Anthropic's AI model, working through
+Claude Code. Boi directed the work: they chose the features, made the design calls, and tested the results in the
+game.
+
+B2recomp describes its own AI use in [its README](B2recomp/README.md).
+
 ## License
 
 - **`B2recomp/`** keeps its own licenses: GPL-3.0-or-later, see [B2recomp/LICENSE](B2recomp/LICENSE) and
