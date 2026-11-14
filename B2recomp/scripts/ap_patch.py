@@ -333,9 +333,71 @@ void f_%(fn)s(Ctx *c) {
 """
 
 
+# Chapter Select shows only the chapters Archipelago gave (runtime/ap_game.c ap_chapter_given / ap_card_index): the card
+# menu's "is chapter c open" (0x7100d96244(save, c)) and "card of chapter c" (0x7100b2aca0) are wrapped. Applied on its
+# own (marker CHAPSEL_MARK), so a gen patched before this was added gets it too.
+CHAPSEL = {'7100d96244': r"""
+void f_7100d96244_game(Ctx *c);
+void f_7100d96244(Ctx *c) {
+    ap_chapsel_look();
+    int r = ap_chapsel_given ? ap_chapsel_given((uint32_t)c->x[1]) : -1;
+    if (r >= 0) { c->x[0] = (uint32_t)r; return; }
+    f_7100d96244_game(c);
+}
+""", '7100b2aca0': r"""
+void f_7100b2aca0_game(Ctx *c);
+void f_7100b2aca0(Ctx *c) {
+    ap_chapsel_look();
+    f_7100b2aca0_game(c);
+    if (ap_chapsel_card) c->x[0] = (uint32_t)ap_chapsel_card((int)(uint32_t)c->x[0]);
+}
+"""}
+CHAPSEL_MARK = '/* [ap_patch.py] chapsel */'
+CHAPSEL_HEAD = CHAPSEL_MARK + r"""
+__declspec(dllimport) void *__stdcall GetModuleHandleA(const char *);
+__declspec(dllimport) void *__stdcall GetProcAddress(void *, const char *);
+static int (*ap_chapsel_given)(uint32_t);
+static int (*ap_chapsel_card)(int);
+static int ap_chapsel_looked;
+static void ap_chapsel_look(void) {
+    if (ap_chapsel_looked) return;
+    ap_chapsel_looked = 1;
+    ap_chapsel_given = (int (*)(uint32_t))GetProcAddress(GetModuleHandleA(0), "ap_chapter_given");
+    ap_chapsel_card = (int (*)(int))GetProcAddress(GetModuleHandleA(0), "ap_card_index");
+}
+"""
+
+
+def patch_chapsel(gen):
+    for fn, wrap in CHAPSEL.items():
+        for name in sorted(n for n in os.listdir(gen) if n.startswith('c_') and n.endswith('.c')):
+            path = os.path.join(gen, name)
+            with open(path, encoding='utf-8', newline='') as f:
+                text = f.read()
+            head = 'void f_%s(Ctx *c) {' % fn
+            if 'void f_%s_game(Ctx *c) {' % fn in text:
+                break                                    # done before
+            if text.count(head) != 1:
+                continue
+            nl = '\r\n' if '\r\n' in text else '\n'
+            inc = '#include "funcs.h"' + nl
+            if text.count(inc) != 1:
+                print('ap_patch.py: no single #include "funcs.h" in %s; Chapter Select is the game\'s own' % name)
+                return
+            body = ('' if CHAPSEL_MARK in text else CHAPSEL_HEAD) + wrap
+            text = text.replace(head, 'void f_%s_game(Ctx *c) {' % fn).replace(inc, inc + body.replace('\n', nl))
+            with open(path, 'w', encoding='utf-8', newline='') as f:
+                f.write(text)
+            print('ap_patch.py: Chapter Select: f_%s wrapped in %s' % (fn, name))
+            break
+        else:
+            print('ap_patch.py: f_%s not found; Chapter Select is the game\'s own' % fn)
+
+
 def main():
     opt = dict(a[2:].split('=', 1) for a in sys.argv[1:] if a.startswith('--') and '=' in a)
     gen = os.path.abspath(opt.get('gen', os.path.join(ROOT, 'build', 'gen_eh')))
+    patch_chapsel(gen)
     want = (LABEL, HELPFN, TITLE, PLAYTIME, CHAPTER, VERSEFN, OPTFN, PAUSEFN, CONDFN) + tuple(COOPSKIP) + tuple(COOPINPUT) + tuple(COOPNEW) + tuple(COOPREQ) + tuple(COOPVERSE) + tuple(COOPFREEZE)
     where, texts = {}, {}
     for name in sorted(n for n in os.listdir(gen) if n.startswith('c_') and n.endswith('.c')):

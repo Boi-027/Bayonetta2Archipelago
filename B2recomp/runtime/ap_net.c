@@ -416,6 +416,8 @@ static void on_connected(J *p, Conn *c) {
 typedef struct { int64_t id; char *name; } LocName;  /* this game's locations (DataPackage) */
 static LocName *g_locs;
 static int g_locs_n;
+static int64_t *g_missing;                            /* this seed's locations not found yet (Connected): hints pick from these */
+static int g_missing_n;                               /* (a location of the game that is not in the seed kills the connection) */
 typedef struct { char *game; int64_t id; char *name; } OtherLoc;   /* every game's locations, for the chat box */
 static OtherLoc *g_alocs;
 static int g_alocs_n, g_alocs_cap;
@@ -519,10 +521,10 @@ void ap_net_hint(void) {
     Conn *c = g_conn;
     int64_t pick = 0;
     int open = 0;
-    for (int i = 0; i < g_locs_n; i++) if (find_check(g_locs[i].id) < 0) open++;
+    for (int i = 0; i < g_missing_n; i++) if (find_check(g_missing[i]) < 0) open++;
     if (open) {
         int k = (int)(GetTickCount() % (DWORD)open);
-        for (int i = 0; i < g_locs_n; i++) if (find_check(g_locs[i].id) < 0 && k-- == 0) { pick = g_locs[i].id; break; }
+        for (int i = 0; i < g_missing_n; i++) if (find_check(g_missing[i]) < 0 && k-- == 0) { pick = g_missing[i]; break; }
     }
     unlock();
     if (!c || !pick) return;
@@ -694,6 +696,13 @@ static int session(Attempt *a, int tls) {           /* 0 = ended after a connect
                 snprintf(g_slot_name, sizeof g_slot_name, "%s", a->slot);
                 for (J *k = j_get(p, "checked_locations") ? j_get(p, "checked_locations")->kid : NULL; k; k = k->next)
                     mark_sent((int64_t)j_num(k, 0));
+                g_missing_n = 0;
+                for (J *k = j_get(p, "missing_locations") ? j_get(p, "missing_locations")->kid : NULL; k; k = k->next) {
+                    int64_t *n = realloc(g_missing, (g_missing_n + 1) * sizeof *n);
+                    if (!n) break;
+                    g_missing = n;
+                    g_missing[g_missing_n++] = (int64_t)j_num(k, 0);
+                }
                 g_items_n = 0;                            /* ReceivedItems follows with the whole list */
                 unlock();
                 set_status(a->gen, "Connected as %s. Choose STORY to play.", a->slot);

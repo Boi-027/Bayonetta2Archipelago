@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ap.h"
+#include "ap_chat.h"
 
 #define EXPORT __declspec(dllexport)
 #define SAVE_CONTINUE 0x1e0                   /* the chapter CONTINUE resumes */
@@ -65,8 +66,22 @@ static void progress_save(void) {
  * the progress file) and sent once the unlock arrives, so the multiworld's logic holds. */
 static int shown_chapter(int c) { return c <= 1 ? 0 : c - 1; }     /* ChapterData 0, 1 = the Prologue */
 
+/* config\archipelago.ini [cheats] send_locked_chapters=1: a locked chapter's checks go out anyway (the story is played
+ * in order and Chapter Select cannot jump ahead to an unlocked chapter yet) */
+static int send_locked_chapters(void) {
+    static int v = -1;
+    if (v < 0) {
+        char ini[MAX_PATH + 32], *s;
+        GetModuleFileNameA(NULL, ini, MAX_PATH);
+        if ((s = strrchr(ini, '\\'))) *s = 0;
+        strcat(ini, "\\..\\config\\archipelago.ini");
+        v = GetPrivateProfileIntA("cheats", "send_locked_chapters", 0, ini) != 0;
+    }
+    return v;
+}
+
 static int chapter_open(int c) {
-    if (c < 0 || c >= 18 || !ap_net_slot_int("chapter_blocking", 0)) return 1;
+    if (c < 0 || c >= 18 || !ap_net_slot_int("chapter_blocking", 0) || send_locked_chapters()) return 1;
     int d = shown_chapter(c);
     if (d == 0 || d == ap_net_slot_int("starting_chapter", 1)) return 1;
     ApItem it[256];
@@ -86,8 +101,104 @@ static void chapter_check(int64_t location, int c) {
     snprintf(key, sizeof key, "%lld", (long long)location);
     snprintf(val, sizeof val, "%d", c);
     if (g_file[0]) WritePrivateProfileStringA("held", key, val, g_file);
+    static uint32_t told;                         /* the chat says so once per chapter and run */
+    if (!(told & 1u << c)) {
+        static const char *roman[] = {"", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII",
+                                      "XIV", "XV", "XVI"};
+        char t[200], item[64];
+        uint8_t col[200];
+        int d = shown_chapter(c);
+        told |= 1u << c;
+        snprintf(item, sizeof item, "Chapter Unlock: Chapter %s", roman[d]);
+        int n = snprintf(t, sizeof t, "Chapter %s is locked: its checks are sent when %s arrives", roman[d], item);
+        int at = (int)(strstr(t, item) - t), len = (int)strlen(item);
+        for (int i = 0; i < n && i < 200; i++) col[i] = i >= at && i < at + len ? CHAT_PROGRESSION : CHAT_TEXT;
+        ap_chat_add(t, col);
+    }
     printf("ap: check %lld held (chapter %d is locked)\n", (long long)location, c);
     fflush(stdout);
+}
+
+/* Chapter Select shows only the chapters AP gave (with chapter blocking, while connected).
+ * Statuses: per difficulty k (0..4) one per ChapterData chapter c at save +0x238 + 0x804 * k + 0x4c * c (0 not reached,
+ * 1 reached, 2 open, 3 cleared on that difficulty). The card menu (0x7100b2aa80) counts the entries of the chapter table
+ * [0x710186d298] (24 ChapterData numbers) that 0x7100d96244(save, c) calls open (status 2 or 3 in any difficulty) and
+ * shows that many cards, card i = table[i]; 0x7100b2aca0 finds the card of a chapter. So here the table lists the given
+ * chapters first, 0x7100d96244 answers "given" (ap_chapter_given, wrapped by scripts/ap_patch.py) and a card index past
+ * them is the last given one (ap_card_index). Given: Records of Time and the Prologue (ChapterData 0, 1), the starting
+ * chapter and every Chapter Unlock (shown chapter d = ChapterData d + 1). Given chapters are also made open (2) in each
+ * difficulty already played. */
+#define CHAPTER_TABLE 0x710186d298ull
+static uint32_t g_given;                              /* ChapterData bits; 0 = the game's own Chapter Select */
+static int g_given_n;
+static uint32_t g_card_table[24];
+static uint64_t g_game_table;                         /* the game's own table (put back when blocking is off) */
+
+static void chapters_given_frame(uint64_t save) {
+    uint32_t given = 0;
+    if (ap_net_slot_int("chapter_blocking", 0)) {
+        int from = 0, total = 0;
+        ApItem it[256];
+        given = 1u << 0 | 1u << 1 | 1u << (ap_net_slot_int("starting_chapter", 1) + 1);
+        do {
+            int k = ap_net_items(from, it, 256, &total);
+            if (k <= 0) break;
+            for (int i = 0; i < k; i++)
+                if (it[i].item >= 220500 && it[i].item < 220516) given |= 1u << (it[i].item - 220500 + 2);
+            from += k;
+        } while (from < total);
+    }
+    uint64_t t = 0;
+    memcpy(&t, (void *)(uintptr_t)CHAPTER_TABLE, 8);
+    if (t && t != (uint64_t)(uintptr_t)g_card_table) g_game_table = t;
+    if (!given || !g_game_table) {                    /* the game's own Chapter Select */
+        g_given = 0;
+        if (g_game_table && t == (uint64_t)(uintptr_t)g_card_table) memcpy((void *)(uintptr_t)CHAPTER_TABLE, &g_game_table, 8);
+        return;
+    }
+    if (given != g_given) {
+        uint32_t game[24];
+        int n = 0;
+        memcpy(game, (void *)(uintptr_t)g_game_table, sizeof game);
+        /* the menu counts entries 0..22 (the 24th ends the list): given story chapters, then the game's own bonus
+         * chapters (22..26, open as the game says), then the story chapters not given */
+        for (int i = 0; i < 23; i++) if (game[i] < 18 && given & 1u << game[i]) g_card_table[n++] = game[i];
+        g_given_n = n;
+        for (int i = 0; i < 23; i++) if (game[i] >= 18) g_card_table[n++] = game[i];
+        for (int i = 0; i < 23; i++) if (game[i] < 18 && !(given & 1u << game[i])) g_card_table[n++] = game[i];
+        g_card_table[23] = game[23];
+        g_given = given;
+        printf("ap: Chapter Select: %d given chapters (mask %x)\n", g_given_n, given);
+        fflush(stdout);
+    }
+    uint64_t mine = (uint64_t)(uintptr_t)g_card_table;
+    if (t != mine) memcpy((void *)(uintptr_t)CHAPTER_TABLE, &mine, 8);
+    if (!save) return;
+    for (int k = 0; k < 5; k++) {
+        uint64_t b = save + 0x238 + 0x804 * k;
+        if (!rd32h(b)) continue;                      /* a difficulty never played stays as it is */
+        for (int c = 0; c < 18; c++)
+            if (given & 1u << c && rd32h(b + 0x4c * c) < 2) wr32h(b + 0x4c * c, 2);
+    }
+}
+
+/* 0x7100d96244(save, chapter) (scripts/ap_patch.py): 1 / 0 = given or not, -1 = ask the game */
+EXPORT int ap_chapter_given(uint32_t c) { return g_given && c < 18 ? (g_given >> c & 1) : -1; }
+
+/* 0x7100b2aca0(.., chapter) -> card index (scripts/ap_patch.py): the card of a story chapter not given -> the last given one */
+EXPORT int ap_card_index(int i) {
+    if (!g_given || g_given_n <= 0 || i < 0 || i >= 23) return i;
+    uint32_t c = g_card_table[i];
+    return c < 18 && !(g_given >> c & 1) ? g_given_n - 1 : i;
+}
+
+/* the title menu (ap_ui.c ap_menu_frame), twice a second: Chapter Select is built from the save before any stage runs */
+void ap_title_frame(void) {
+    static int tick;
+    uint64_t save;
+    if (++tick % 30) return;
+    memcpy(&save, (void *)(uintptr_t)0x71018668d0ull, 8);
+    chapters_given_frame(save);
 }
 
 static void held_frame(void) {                    /* the held checks whose chapter is open now */
@@ -515,30 +626,40 @@ EXPORT void ap_chapter_done(uint64_t save, int chapter) {
 /* ---------------------------------------------------------------------------------------------- Gates of Hell */
 
 /* Accessory m (1..14): bit m + 1 (MSB first; bit 7 = Gaze of Despair, 06) of save +0xa478 owned, +0xa47c its "new" mark (0x7100d96d44, the shop's
- * purchase). Technique: bit TEC_NAME_SP_nn of +0xa4d8. A bit that turns on without AP having given that item is a
- * purchase (or a story unlock): its Gates of Hell location (225100 + k, 225200 + nn). While connected the bits are
- * exactly what AP gave (the five techniques of a new save always stay). */
+ * purchase). Technique: bit <technique ID> of +0xa4d8 (0x7100d90908). The ID is not the TEC_NAME_SP_nn of its name:
+ * 0x71008cf93c(id) picks the name (IDs 3 / 4 / 26 by character: Bayonetta's Crow Within / Bat Within / Umbran Spear,
+ * Jeanne's Owl / Moth, Rosa's Falcon / Hornet); the Gates of Hell lists IDs 28 21 10 12 8 9 17 19 18 15 16 27 4 3 26
+ * (0x7100b39b74). A bit that turns on without AP having given that item is a purchase: its Gates of Hell location
+ * (225100 + k, 225200 + tec_location). While connected those bits are exactly what AP gave; the other bits of the word
+ * (story flags) are left alone. */
 #define SAVE_ACCESSORIES 0xa478
 #define SAVE_ACCESSORIES_NEW 0xa47c
 #define SAVE_TECHNIQUES 0xa4d8
 #define SHOP_BASE 225000
-static const int k_tec_no[19] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 16, 17, 12, 19, 20};   /* Items.py order */
-#define TEC_DEFAULT (0x80000000u >> 0 | 0x80000000u >> 1 | 0x80000000u >> 6 | 0x80000000u >> 13 | 0x80000000u >> 14)
+/* Items.py TECHNIQUES -> technique ID. Moth / Owl (Jeanne's names) are in no pool; the first seeds had Hornet / Falcon in
+ * place of Stiletto / Heel Slide, so those give Stiletto / Heel Slide. */
+static const int k_tec_no[19] = {10, 12, 8, 9, 17, 19, 18, 15, 16, 27, 4, 3, 4, 3, 10, 12, 26, 28, 21};
+/* technique ID -> its location (225200 + n): the numbers the first seeds gave each name, Stiletto / Heel Slide on the
+ * Hornet / Falcon ones, After Burner Kick new (206) */
+static int tec_location(int id) {
+    static const int8_t loc[32] = {[3] = 11, [4] = 10, [8] = 2, [9] = 3, [10] = 16, [12] = 17, [15] = 7, [16] = 8, [17] = 4,
+                                   [18] = 6, [19] = 5, [21] = 20, [26] = 12, [27] = 9, [28] = 19};
+    return id > 0 && id < 32 && loc[id] ? loc[id] : -1;
+}
 
 static void shop_frame(uint64_t save, uint32_t accessories, uint32_t techniques, int connected) {
     static int based;
     static uint32_t prev_acc, prev_tec;
     uint32_t acc_mask = 0, tec_mask = 0;
     for (int k = 1; k <= 14; k++) acc_mask |= 0x80000000u >> (k + 1);
-    for (int i = 0; i < 19; i++) tec_mask |= 0x80000000u >> k_tec_no[i];
-    tec_mask &= ~TEC_DEFAULT;
+    for (int i = 0; i < 32; i++) if (tec_location(i) >= 0) tec_mask |= 0x80000000u >> i;
     uint32_t acc = rd32h(save + SAVE_ACCESSORIES), tec = rd32h(save + SAVE_TECHNIQUES);
     if (!based) { based = 1; prev_acc = 0; prev_tec = 0; }       /* what the save holds already counts too */
     uint32_t bought = acc & ~prev_acc & acc_mask & ~accessories, learned = tec & ~prev_tec & tec_mask & ~techniques;
     for (int k = 1; k <= 14; k++)
         if (bought & 0x80000000u >> (k + 1)) { printf("ap: accessory %d bought\n", k); ap_net_check(SHOP_BASE + 100 + k); }
     for (int n = 0; n < 32; n++)
-        if (learned & 0x80000000u >> n) { printf("ap: technique %d learned\n", n); ap_net_check(SHOP_BASE + 200 + n); }
+        if (learned & 0x80000000u >> n) { printf("ap: technique %d learned\n", n); ap_net_check(SHOP_BASE + 200 + tec_location(n)); }
     if (bought | learned) fflush(stdout);
     if (connected) {
         if (GetTickCount64() < g_amnesia_until) techniques = 0;      /* the Amnesia trap */
@@ -1203,6 +1324,7 @@ static void game_frame(uint64_t save) {
         set_pieces(save, ID_PEARL_PIECE, SAVE_PEARL_PIECES, pieces[1]);
         shop_frame(save, accessories, techniques, 1);
         weapons_frame(save, weapons);
+        chapters_given_frame(save);
     }
     ApItem got[32];
     int total, n = ap_net_items(g_applied, got, 32, &total);

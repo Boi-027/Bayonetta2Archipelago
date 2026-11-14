@@ -381,6 +381,7 @@ EXPORT uint32_t ap_menu_frame(uint64_t tit_mcd, int32_t *cursor) {
     g_hold_frames = (b & g_prev_buttons) ? g_hold_frames + 1 : 0;
     g_prev_buttons = b;
     uint32_t r = 0;
+    { void ap_title_frame(void); ap_title_frame(); }   /* ap_game.c: Chapter Select opened up to the unlocks */
     lock();
     load_fields();
     {   /* TEST ONLY: RECOMPS_AP_TEST_CONNECT=1 connects with the saved fields at the first title frame */

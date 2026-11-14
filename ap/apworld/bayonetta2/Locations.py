@@ -46,6 +46,9 @@ def verse_names():
         shown = muspel = 0
         for c in DATA_CHAPTERS[d]:
             for v in range(1, STORY_VERSES[c] + 1):
+                if c == 0:                                # ChapterData 0: the opening stage before the Prologue's verses
+                    out.append((d, name, c, v, "%s - Records of Time" % name))
+                    continue
                 shown += 1
                 if (c, v) in MUSPELHEIM_VERSES:
                     muspel += 1
@@ -131,15 +134,17 @@ for k, (title, _) in TEARS.items():
     location_table["Tear of Blood: %s" % title] = LocationData(TEAR_BASE + k, TEARS_REGION, "Tears of Blood")
 
 # Gates of Hell purchases. Accessory k (ITM_ACCESSORY_NAME_k, 1..14) is bit k + 1 of save +0xa478 (0x7100d96d44 sets it when bought); a
-# technique is bit TEC_NAME_SP_nn of +0xa4d8. The five techniques a new save already has are no locations.
+# technique is bit <technique ID> of +0xa4d8 (runtime/ap_game.c tec_location maps the ID to these numbers). The shop sells
+# these 15 to Bayonetta; Moth / Owl / Hornet / Falcon Within are other characters' names for the same IDs. The numbers are
+# the first seeds' (Stiletto and Heel Slide took Hornet's and Falcon's), so those seeds keep working.
 SHOP_BASE, SHOP_REGION = 225000, -5
-TECHNIQUE_NO = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 16, 17, 12, 19, 20]   # Items.py TECHNIQUES -> TEC_NAME_SP_nn
-DEFAULT_TECHNIQUES = {0, 1, 6, 13, 14}                                             # bits of a new save (0xc2060000)
+TECHNIQUE_LOCATIONS = {"Tetsuzanko": 2, "Heel Stomp": 3, "Breakdance": 4, "Witch Strike": 5, "After Burner Kick": 6,
+                       "Witch Twist": 7, "Heel Tornado": 8, "Charge Bullet": 9, "Bat Within": 10, "Crow Within": 11,
+                       "Umbran Spear": 12, "Stiletto": 16, "Heel Slide": 17, "Dodge Offset": 19, "Air Dodge": 20}
 for k, name in enumerate(ACCESSORIES, 1):
     location_table["Gates of Hell: %s" % name] = LocationData(SHOP_BASE + 100 + k, SHOP_REGION, "Gates of Hell")
-for name, no in zip(TECHNIQUES, TECHNIQUE_NO):
-    if no not in DEFAULT_TECHNIQUES:
-        location_table["Gates of Hell: %s" % name] = LocationData(SHOP_BASE + 200 + no, SHOP_REGION, "Gates of Hell")
+for name, no in TECHNIQUE_LOCATIONS.items():
+    location_table["Gates of Hell: %s" % name] = LocationData(SHOP_BASE + 200 + no, SHOP_REGION, "Gates of Hell")
 
 location_name_groups = {}
 for n, d in location_table.items():

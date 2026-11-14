@@ -9,8 +9,8 @@ from worlds.AutoWorld import WebWorld, World
 from .Items import (CHAPTER_NAMES, CHAPTER_UNLOCKS, CONSUMABLES, HALOS, MACGUFFIN, PIECES, TECHNIQUES, TRAPS,
                     item_name_groups,
                     item_table)
-from .Locations import (BOSS_CHAPTERS, DEFAULT_TECHNIQUES, MUSPEL_REGION, RANK_BASE, SHOP_BASE, SHOP_REGION, TEARS,
-                        TEARS_REGION, TECHNIQUE_NO, TRIAL_REGION,
+from .Locations import (BOSS_CHAPTERS, MUSPEL_REGION, RANK_BASE, SHOP_BASE, SHOP_REGION, TEARS,
+                        TEARS_REGION, TECHNIQUE_LOCATIONS, TRIAL_REGION,
                         location_name_groups, location_table)
 from .Options import Bayonetta2Options, Goal
 
@@ -126,9 +126,8 @@ class Bayonetta2World(World):
         groups = {"Weapons": o.include_weapons, "Accessories": o.include_accessories, "Techniques": o.include_techniques}
         for group, on in groups.items():
             if on:
-                pool += sorted(n for n in item_name_groups[group]      # not the techniques a new save already has
-                               if n not in skip and
-                               (group != "Techniques" or TECHNIQUE_NO[TECHNIQUES.index(n)] not in DEFAULT_TECHNIQUES))
+                pool += sorted(n for n in item_name_groups[group]      # techniques: the 15 Bayonetta's shop sells
+                               if n not in skip and (group != "Techniques" or n in TECHNIQUE_LOCATIONS))
         if o.chapter_blocking:
             start = "Chapter Unlock: %s" % CHAPTER_NAMES[o.starting_chapter.value]
             pool += [u for u in CHAPTER_UNLOCKS if u != start]

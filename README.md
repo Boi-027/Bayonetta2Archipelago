@@ -92,8 +92,10 @@ often each one appears.
 - **Top Banner:** Co-op status ("Waiting for your partner", "Skip 1/2", "Your partner fell") at the top of the screen.
 - **Cheats Pages (Options → Display):** God Mode, Infinite Halos, Infinite Magic, Damage Taken and Halo Gain
   multipliers, Auto QTEs, and Easy Cutscene Skip.
-- **Chapter Blocking:** A locked chapter can still be played, but its checks are held and sent once its Chapter
-  Unlock arrives, so the multiworld's logic holds.
+- **Chapter Blocking:** Chapter Select shows only the chapters AP has given you (the Prologue, your starting chapter
+  and every Chapter Unlock), so you can jump straight to any of them. If the story carries you into a locked chapter,
+  its checks are held and sent once its Chapter Unlock arrives (or sent right away with `send_locked_chapters=1` in
+  `config/archipelago.ini`).
 - **Book Hints:** Reading a book in a chapter shows an Archipelago hint.
 
 ---

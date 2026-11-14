@@ -563,3 +563,33 @@ in a scripted run from a Chapter I checkpoint save copy: CONTINUE, then `600:- 2
   - Step screenshots (SSBU_SHOT_STEPS) are the game's frame without the chat box / banner (drawn at present).
   - Not handled: two players at different checkpoints (each restarts from its own), a death while the other player
     has no player object (menus, cinematics: ignored).
+
+## 2026-11-13, first real seed: fixes
+- Disconnects: a book's hint scouted a random location of the whole game (the DataPackage); one not in the seed
+  (e.g. a tier-0 "Any Medal" rank in an all_medals seed) makes the server raise KeyError in LocationScouts and drop
+  the client. Hints now pick from Connected's missing_locations (ap_net.c g_missing).
+- Techniques: +0xa4d8 bit = the game's technique ID, not TEC_NAME_SP_nn. 0x71008cf93c(id) names it (jump table
+  0x710151d0a0, ids 3..28): 3 Crow / 4 Bat / 26 Umbran Spear (Bayonetta; Jeanne Owl / Moth, Rosa Falcon / Hornet by
+  save +0xa4b4), 8 Tetsuzanko, 9 Heel Stomp, 10 Stiletto, 12 Heel Slide, 15 Witch Twist, 16 Heel Tornado,
+  17 Breakdance, 18 After Burner Kick, 19 Witch Strike, 21 Air Dodge, 27 Charge Bullet, 28 Dodge Offset. The Gates of
+  Hell lists 28 21 10 12 8 9 17 19 18 15 16 27 4 3 26 (0x7100b39b74). Other bits of the word are story flags (bit 2
+  turns on by itself: it was taken for Tetsuzanko). Location numbers kept from the first seeds (ap_game.c tec_location).
+- ChapterData 0 = "Records of Time - The End" (COM_BASE_CHAPTER_95), 1 = Prologue "World of Chaos", 2 = Chapter I.
+  Its verse is now named "Prologue - Records of Time" (same ID).
+- Chapter Select: per difficulty k (0..4) a status per ChapterData chapter c at save +0x238 + 0x804 * k + 0x4c * c
+  (0 not reached, 1 reached, 2 open, 3 cleared on that difficulty; k = 4 is all 0 until unlocked). The cards offer c
+  when status(c) >= 1 and status(c - 1) >= 2 (tested by editing save copies: [3,2,2,2,2,2,2,0] offers up to Chapter V).
+  ap_game.c chapter_select_frame raises every chapter up to the highest Chapter Unlock to 2 in each block with
+  status(0) != 0, from the title menu (ap_ui.c ap_menu_frame -> ap_title_frame: the cards are built before any stage
+  runs) and in play. Tested on a local seed (start_inventory Chapter Unlock: Chapter V, Prologue save): Chapter Select
+  offers Prologue .. Chapter V, and Chapter V starts. config [cheats] send_locked_chapters=1 still sends a locked
+  chapter's checks anyway (the user's first seed); a held check says so in the chat once per chapter.
+- Infinite Halos (cheat) pins +0xa840, so Halo items show nothing while it is on.
+- Chapter Select shows only given chapters (B1's behaviour): the card menu 0x7100b2aa80 counts the entries 0..22 of
+  the chapter table [0x710186d298] (0..17, 22..26, then 0 ending it) that 0x7100d96244(save, c) calls open, and card i
+  is table[i] (menu +11152 the card, +11156 the count; 0x7100b2aca0 finds a chapter's card). The client puts its own
+  table there (given story chapters first, the bonus chapters 22..26, then the rest), 0x7100d96244 answers "given"
+  for c < 18 (ap_chapter_given) and 0x7100b2aca0's card of a hidden chapter becomes the last given card
+  (ap_card_index); both wrapped by scripts/ap_patch.py patch_chapsel (its own marker, so an already patched gen gets
+  it). Found with read watches on the statuses (RECOMPS_AP_TEST_WATCHPTR=71018668d0,a88,14 RECOMPS_WATCH_RW=3).
+  Tested on a local seed: Records of Time, Prologue, Chapter I, Chapter V shown, II-IV hidden; Chapter V starts.
