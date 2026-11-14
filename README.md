@@ -4,7 +4,8 @@ An Archipelago (https://archipelago.gg) randomizer for **Bayonetta 2 (Switch v1.
 through **[B2recomp](B2recomp/README.md)**, the static recompilation of the game. Location checks and items are sent
 and received in real time while you play, with direct-IP **Story Co-op** for two players.
 
-Everything happens inside the game: you connect from the title menu, and no separate client window is needed.
+Everything happens inside the game: you connect from the title menu, and no separate client window is needed. The
+**Bayonetta 2 Archipelago launcher** installs everything with one button, and plays, configures and uninstalls it.
 
 > **This repository contains no game code and no game assets.** B2recomp translates the game on your PC from your own
 > dump, and the Archipelago mod's menu text and logo are built from your own game files. Please don't share anything
@@ -15,6 +16,20 @@ Everything happens inside the game: you connect from the title menu, and no sepa
 ---
 
 ## Features
+
+### Bayonetta 2 Archipelago Launcher
+- **One-Click Install:** Point it at your dump and press Install. It builds the game, builds the Archipelago mod from
+  your game files, puts `bayonetta2.apworld` into Archipelago's `custom_worlds` folder and makes a desktop shortcut.
+  It finds your Archipelago folder by itself.
+- **Update and Uninstall:** Update rebuilds what changed and refreshes the APWorld (the Home page says when it is out of
+  date). Uninstall moves everything to the Recycle Bin and keeps your saves and settings.
+- **Connection Settings:** Server, slot and password, plus "connect automatically" so the game connects at the title
+  screen. Shared with the game's own ARCHIPELAGO menu.
+- **In-Game Options:** God Mode, Infinite Halos and Magic, Auto QTEs, Easy Cutscene Skip, Damage Taken and Halo Gain.
+- **Player Options:** Every option of the world, exported as your YAML straight into Archipelago's Players folder.
+- **In the game's style:** The game's menu font, its title logo and key art (taken from your own game files at
+  install), the turning Umbran seal, and keyboard and controller navigation.
+- **Quick Links:** Play, the Archipelago Launcher, your saves, the game log, graphics and controller settings.
 
 ### Native Title Screen Integration
 - An **ARCHIPELAGO** entry on the title menu wheel, in the game's own font. It opens ADDRESS / SLOT / PASSWORD /
@@ -115,6 +130,7 @@ often each one appears.
 - In-game chat box
 - Cheats pages in the game's Options menu
 - Story Co-op: lobby menu, partner character, enemy sync, verse sync, skip voting, falling together, partner removal
+- Launcher with one-click install, update, uninstall, connection settings, in-game options and a YAML editor
 
 ### In Progress
 - A full playthrough to find what breaks in long runs
@@ -124,7 +140,6 @@ often each one appears.
 ### To Do
 - Apply the partner's chosen outfit in co-op (the CHARACTER setting is in the menu, but outfits aren't applied yet)
 - Co-op players at different checkpoints
-- Release package (prebuilt tools, the mod and the `.apworld`)
 
 ### Not Planned / Stretch
 - Internet co-op without port forwarding (would need a relay server)
@@ -136,39 +151,45 @@ often each one appears.
 - **Your own dump of Bayonetta 2 (Switch), version 1.2**, as plain files (`exefs` and `romfs`). See
   [B2recomp/BUILDING.md](B2recomp/BUILDING.md).
 - **Windows 10/11 x64** and a GPU with a **Vulkan 1.3** driver.
-- **Python 3.10+** and the build tools listed in [B2recomp/BUILDING.md](B2recomp/BUILDING.md).
+- Nothing else: the release brings its own compiler and Python. (From the source: Python 3.10+ and the build tools
+  listed in [B2recomp/BUILDING.md](B2recomp/BUILDING.md).)
 - An **Archipelago server** hosting a multiworld session (Archipelago 0.6.x).
 
 ---
 
 ## Installation
 
-1. **Build B2recomp** from your dump, following [B2recomp/README.md](B2recomp/README.md) and
-   [B2recomp/BUILDING.md](B2recomp/BUILDING.md). The Archipelago patch (`B2recomp/scripts/ap_patch.py`) runs as part of
-   that build.
-2. **Build the Archipelago mod** from your game files (menu text, font and logo):
-   ```
-   python ap/tools/build_mod.py B2recomp B2recomp/mods/Archipelago
-   ```
-   The game loads it from `B2recomp/mods/` the next time it starts.
-3. **Make sure to back up your saves before playing!**
+### With the Launcher (recommended)
+1. Download `Bayonetta2Archipelago-<version>.zip` from the [Releases](https://github.com/Boi-027/Bayonetta2Archipelago/releases)
+   page and unzip it to a folder of its own, with about 2 GB free.
+2. Start **`Bayonetta 2 Archipelago.exe`** and open **Install**.
+3. Choose your dump folder (the one that holds `exefs` and `romfs`). Check that it found your Archipelago folder.
+4. Press **Install**. The first build takes about 5 to 15 minutes, most of it compiling.
+5. **Make sure to back up your saves before playing!** (Play Data on the Home page.)
+
+To update, unzip the new release over the old folder and press **Update**.
+
+### From the source
+1. Build B2recomp from your dump ([B2recomp/BUILDING.md](B2recomp/BUILDING.md)); `scripts/ap_patch.py` runs as part of it.
+2. `python ap/tools/build_mod.py B2recomp B2recomp/mods/Archipelago` (the Archipelago mod, from your game files).
+3. `python ap/tools/pack_apworld.py <Archipelago>/custom_worlds`.
+4. `python ap/tools/build_launcher.py` builds the launcher.
 
 ## APWorld Setup
 
-1. Pack the apworld:
-   ```
-   python ap/tools/pack_apworld.py .
-   ```
-2. Put `bayonetta2.apworld` in your Archipelago `custom_worlds` folder.
-3. Use **Generate Template Options** in the Archipelago Launcher to get a YAML, edit it, and put it in `Players`.
-4. Generate your multiworld as usual. The Bayonetta 2 world will now be available.
+1. The launcher installs `bayonetta2.apworld` for you. Players who only generate can take it from the Releases page and
+   put it in Archipelago's `custom_worlds` folder.
+2. Make your YAML on the launcher's **Player Options** page and press **Export** (or use **Generate Template Options** in
+   the Archipelago Launcher).
+3. Generate your multiworld as usual.
 
 **After updating, regenerate your seed.** Location IDs can change between versions.
 
 ## Playing
 
-1. Start the game.
-2. Select **ARCHIPELAGO** on the title menu, set **ADDRESS**, **SLOT** and **PASSWORD**, then select **CONNECT**.
+1. Press **Play** in the launcher.
+2. If you didn't turn on "connect automatically", select **ARCHIPELAGO** on the title menu, set **ADDRESS**, **SLOT**
+   and **PASSWORD**, then select **CONNECT**.
 3. Select **STORY** and play! Checks fire automatically as you clear verses and chapters, open chests, find crows and
    books, and buy at the Gates of Hell.
 4. Items and messages appear in the chat box.

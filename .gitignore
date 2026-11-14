@@ -6,3 +6,9 @@
 /ap/*.png
 **/__pycache__/
 *.pyc
+
+# built here, never committed
+/Bayonetta 2 Archipelago.exe
+/build_release/
+/ap/launcher/build/
+launcher_test.log

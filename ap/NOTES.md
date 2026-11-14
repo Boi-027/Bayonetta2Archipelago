@@ -593,3 +593,21 @@ in a scripted run from a Chapter I checkpoint save copy: CONTINUE, then `600:- 2
   (ap_card_index); both wrapped by scripts/ap_patch.py patch_chapsel (its own marker, so an already patched gen gets
   it). Found with read watches on the statuses (RECOMPS_AP_TEST_WATCHPTR=71018668d0,a88,14 RECOMPS_WATCH_RW=3).
   Tested on a local seed: Records of Time, Prologue, Chapter I, Chapter V shown, II-IV hidden; Chapter V starts.
+
+## 2026-11-13: the Bayonetta 2 Archipelago launcher (ap/launcher/ap_launcher.c)
+- One window drawn by hand (GDI, double-buffered, 30 frames a second): Home (status, Play), Install (setup.py, then
+  build_mod.py, pack_apworld.py, desktop shortcut, as one job list; Update; Uninstall to the Recycle Bin keeping
+  build\play), Connection (archipelago.ini [connection] incl. auto_connect, [cheats]), Player Options (YAML into
+  Archipelago's Players), Game Settings (B2recomp's own launcher), About. Keyboard and XInput: up / down pages, A / Enter
+  the page's action, B / Esc Home.
+- The look comes from the player's files at install (ap/tools/launcher_assets.py, run by build_mod.py, into
+  B2recomp\mods\Archipelago\launcher\): ui_title_us.dat title.wtp textures: title_logoimg (front logo 48,672..1240,1056
+  with the AP logo in its O as the mod's title, gold 2 1808,8..2024,224, Umbran seal 1288,0..1776,496, moon
+  992,1176..1416,1608), title_menu_trial (key art 0,0..758,368); the title menu font (mmTIT001 font 1: - ? A..Y without
+  J Q V, and the stylised o) cut to its ink, white. Without them a serif and no art.
+- The runtime: [connection] auto_connect=1 connects at the first title frame (ap_ui.c).
+- pack_apworld.py writes the same bytes for the same files, so the launcher compares the installed .apworld with a fresh one.
+- Tests: --shot <page> <bmp>, --test-yaml <file>, --test-install (wrote launcher_test.log; full install on the dev tree:
+  3 min, all four jobs ok), --test-uninstall (checked on a throwaway tree: build\ except play, targets, the mod, the
+  apworld and the shortcut gone; saves, config, other apworlds kept).
+- Release: ap/tools/make_release.py (B2recomp/scripts/make_package.py for the builder part, its source from HEAD:B2recomp).

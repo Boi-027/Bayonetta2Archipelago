@@ -384,9 +384,15 @@ EXPORT uint32_t ap_menu_frame(uint64_t tit_mcd, int32_t *cursor) {
     { void ap_title_frame(void); ap_title_frame(); }   /* ap_game.c: Chapter Select opened up to the unlocks */
     lock();
     load_fields();
-    {   /* TEST ONLY: RECOMPS_AP_TEST_CONNECT=1 connects with the saved fields at the first title frame */
+    {   /* [connection] auto_connect=1 (the Archipelago launcher's switch; RECOMPS_AP_TEST_CONNECT=1 in tests): connect with
+         * the saved fields at the first title frame */
         static int once;
-        if (!once) { once = 1; const char *e = getenv("RECOMPS_AP_TEST_CONNECT"); if (e && atoi(e)) ap_net_connect(g_field[E_ADDRESS], g_field[E_SLOT], g_field[E_PASSWORD]); }
+        if (!once) {
+            once = 1;
+            const char *e = getenv("RECOMPS_AP_TEST_CONNECT");
+            if (((e && atoi(e)) || GetPrivateProfileIntA("connection", "auto_connect", 0, g_ini)) && g_field[E_SLOT][0])
+                ap_net_connect(g_field[E_ADDRESS], g_field[E_SLOT], g_field[E_PASSWORD]);
+        }
     }
     {   /* TEST ONLY: RECOMPS_COOP_TEST=join:<address> (or host) at the first title frame, with the saved name / password */
         static int once;

@@ -292,3 +292,5 @@ if __name__ == '__main__':
     chests_mod.main(sys.argv[1], sys.argv[2])
     import title_logo                                  # the title logo (ui/ui_title_us.dat)
     title_logo.main(sys.argv[1], sys.argv[2])
+    import launcher_assets                             # the launcher's pictures and lettering (launcher/)
+    launcher_assets.main(sys.argv[1], sys.argv[2])
