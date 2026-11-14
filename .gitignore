@@ -1,0 +1,8 @@
+# Source only. The game's own files and anything made from them stay on this PC.
+# B2recomp/ has its own allowlist (B2recomp/.gitignore).
+/Bayo 2 Dump/
+/ap/research/
+/ap/screenshots/
+/ap/*.png
+**/__pycache__/
+*.pyc
