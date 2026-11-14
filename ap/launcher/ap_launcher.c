@@ -325,8 +325,9 @@ static void fill(HDC dc, RECT r, COLORREF c) { HBRUSH b = CreateSolidBrush(c); F
 static RECT rc(int x, int y, int w, int h) { RECT r = { S(x), S(y), S(x + w), S(y + h) }; return r; }
 static RECT rcs(int x, int y, int w, int h) { RECT r = rc(x, y, w, h); OffsetRect(&r, 0, -g_scroll); return r; }
 static HBITMAP profile(COLORREF c, int kind) {       /* 1 px strips: 0 solid, 1 a band fading at both ends, 2 fading to the right, 3 fading down */
-    static struct { COLORREF c; int kind; HBITMAP bm; } cache[32];
-    static int n;
+    static struct { COLORREF c; int kind; HBITMAP bm; } cache[96];
+    static int n, next;
+    c = RGB(GetRValue(c) & 0xf8, GetGValue(c) & 0xf8, GetBValue(c) & 0xf8);   /* shades in steps of 8: a bounded set */
     for (int i = 0; i < n; i++) if (cache[i].c == c && cache[i].kind == kind) return cache[i].bm;
     int len = 128, w = kind == 3 ? 1 : len, h = kind == 3 ? len : 1;
     BITMAPINFO bi = { { sizeof(BITMAPINFOHEADER), w, -h, 1, 32, BI_RGB } };
@@ -341,7 +342,8 @@ static HBITMAP profile(COLORREF c, int kind) {       /* 1 px strips: 0 solid, 1 
         d[i * 4 + 0] = (unsigned char)(GetBValue(c) * a); d[i * 4 + 1] = (unsigned char)(GetGValue(c) * a);
         d[i * 4 + 2] = (unsigned char)(GetRValue(c) * a); d[i * 4 + 3] = (unsigned char)(255 * a);
     }
-    if (n < 32) cache[n++] = (typeof(cache[0])){ c, kind, bm };
+    if (n < 96) cache[n++] = (typeof(cache[0])){ c, kind, bm };
+    else { DeleteObject(cache[next].bm); cache[next] = (typeof(cache[0])){ c, kind, bm }; next = (next + 1) % 96; }
     return bm;
 }
 static void strip(HDC dc, RECT r, COLORREF c, int kind, int alpha) {
@@ -383,6 +385,7 @@ static HFONT serif_at(int h) {
     static struct { int h; HFONT f; } cache[12];
     static int n;
     for (int i = 0; i < n; i++) if (cache[i].h == h) return cache[i].f;
+    if (n == 12) return cache[11].f;                  /* (a handful of sizes are used) */
     LOGFONTW lf = { 0 };
     lf.lfHeight = -(h * 7 / 10); lf.lfWeight = FW_BOLD; lf.lfQuality = CLEARTYPE_QUALITY;
     wcscpy(lf.lfFaceName, L"Palatino Linotype");
@@ -408,6 +411,7 @@ static int gtext_w(HDC dc, int h, const wchar_t *t) {
 }
 static void gtext(HDC dc, int x, int y, int h, COLORREF c, int alpha, const wchar_t *t) {
     float k = g_glyph_h ? (float)h / g_glyph_h : 0;
+    c = RGB(GetRValue(c) & 0xf0, GetGValue(c) & 0xf0, GetBValue(c) & 0xf0);
     HBITMAP atlas = im_font.px ? scaled(&im_font, 0, 0, im_font.w, im_font.h, (int)(im_font.w * k), h, c) : NULL;
     for (const wchar_t *p = t; *p; p++) {
         if (*p == L' ') { x += h * 42 / 100; continue; }
@@ -503,6 +507,7 @@ static ULONGLONG g_anim0;                             /* the animations' clock *
 
 /* ================================================================ files of the install */
 static void refresh_status(void);
+static void load_assets(void);
 static int game_built(void) {
     wchar_t a[MAX_PATH], b[MAX_PATH], c[MAX_PATH];
     pathf(a, L"%s\\build\\game_native.exe", g_b2); pathf(b, L"%s\\build\\game.dll", g_b2); pathf(c, L"%s\\targets\\exefs\\main.elf", g_b2);
@@ -797,6 +802,7 @@ static void job_finish(DWORD code) {
     if (g_job < 0) return;
     int j = g_job;
     g_job_state[j] = code == 0 ? 2 : 3;
+    if (j == J_MOD && code == 0) load_assets();       /* the game's font, logo and art: there now */
     if (code != 0) {
         wchar_t t[200];
         swprintf(t, 200, L"%s stopped (exit %lu). The details below say why.", k_job_name[j], (unsigned long)code);
@@ -1579,8 +1585,10 @@ static void primary(void) {                          /* Enter / the controller's
     else if (g_page == P_INSTALL) { if (g_job < 0) install_start(); }
     else if (g_page == P_OPTIONS) yaml_save(0);
 }
+static int g_loading = 1;
 static void field_changed(int e) {
     wchar_t v[MAX_PATH];
+    if (g_loading) return;
     if (e == E_ADDRESS || e == E_SLOT || e == E_PASSWORD) {
         static const wchar_t *k[3] = { L"address", L"slot", L"password" };
         GetWindowTextW(g_e[e], v, MAX_PATH);
@@ -1821,6 +1829,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmdline, int show) {
         SetWindowTextW(g_e[E_PLAYER], v);
         SetWindowTextW(g_e[E_DUMP], g_dump);
         SetWindowTextW(g_e[E_APDIR], g_apdir); }
+    g_loading = 0;
     refresh_status();
 
     /* tests: --test-yaml <file> writes the YAML; --test-uninstall uninstalls without asking; --test-install installs
@@ -1833,7 +1842,6 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmdline, int show) {
     if (cmdline && wcsstr(cmdline, L"--test-uninstall")) { g_test_yes = 1; uninstall(); return 0; }
     if (cmdline && wcsstr(cmdline, L"--test-install")) {
         g_test_yes = 1;
-        ShowWindow(g_wnd, SW_SHOWNOACTIVATE);
         set_page(P_INSTALL);
         SetTimer(g_wnd, 1, 33, NULL);
         install_start();
