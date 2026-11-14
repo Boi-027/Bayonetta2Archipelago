@@ -663,6 +663,9 @@ static void shop_frame(uint64_t save, uint32_t accessories, uint32_t techniques,
     if (bought | learned) fflush(stdout);
     if (connected) {
         if (GetTickCount64() < g_amnesia_until) techniques = 0;      /* the Amnesia trap */
+        /* only the groups the seed randomizes (slot_data; older seeds: all); the others stay as bought */
+        if (!ap_net_slot_int("include_accessories", 1)) acc_mask = 0;
+        if (!ap_net_slot_int("include_techniques", 1)) tec_mask = 0;
         uint32_t want_acc = (acc & ~acc_mask) | accessories, want_tec = (tec & ~tec_mask) | techniques;
         if (want_acc != acc) {                                   /* newly given ones get the menu's "new" mark */
             wr32h(save + SAVE_ACCESSORIES, want_acc);
@@ -685,6 +688,7 @@ static void shop_frame(uint64_t save, uint32_t accessories, uint32_t techniques,
 static const int k_weapon_bit[13] = {-1, 4, 1, 2, 5, 3, 8, 7, 13, 14, 15, -1, 17};   /* Items.py WEAPONS order */
 
 static void weapons_frame(uint64_t save, uint32_t given) {
+    if (!ap_net_slot_int("include_weapons", 1)) return;          /* not randomized: the game's own Golden LPs */
     uint32_t mask = 0;
     for (int i = 0; i < 13; i++) if (k_weapon_bit[i] >= 0) mask |= 0x80000000u >> k_weapon_bit[i];
     uint32_t cur = rd32h(save + SAVE_WEAPONS), want = (cur & ~mask) | (given & mask);

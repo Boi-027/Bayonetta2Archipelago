@@ -59,6 +59,7 @@ def _add(names, base, cls, group):
 _add(WEAPONS, 220001, IC.progression, "Weapons")
 _add(ACCESSORIES, 220100, IC.useful, "Accessories")
 _add(TECHNIQUES, 220150, IC.useful, "Techniques")
+item_table["Crow Within"] = item_table["Crow Within"]._replace(classification=IC.progression)   # flight: __init__ set_rules
 _add(GOLDEN_LPS, 220200, IC.useful, "Golden LPs")
 _add(CONSUMABLES, 220300, IC.filler, "Consumables")
 _add(PIECES, 220400, IC.useful, "Pieces")

@@ -611,3 +611,19 @@ in a scripted run from a Chapter I checkpoint save copy: CONTINUE, then `600:- 2
   3 min, all four jobs ok), --test-uninstall (checked on a throwaway tree: build\ except play, targets, the mod, the
   apworld and the shortcut gone; saves, config, other apworlds kept).
 - Release: ap/tools/make_release.py (B2recomp/scripts/make_package.py for the builder part, its source from HEAD:B2recomp).
+
+## 2026-11-14: logic (what checks need)
+- Research: ap/research/reports/Bayonetta 2 check requirements.md (guides matched to the location names; local only).
+- Panther and Snake Within, Witch Time and Witch Walk are the game's own. Crow Within is progression and gates
+  Chapter I - Umbran Crow 2, Chapter XVI - Umbran Crow 1, Chapter V - Chest 9 and Gates of Hell: Umbran Spear
+  (techniques not randomized: Chapter I complete, when the shop sells it). Snake Within (start of Chapter V):
+  Chapter I - Chest 2, 5, 16 and Chapter VIII - Muspelheim 2 need Chapter V reachable (one of Chest 2 / 5 is the
+  alcove heart; both until checked in game).
+- Gates of Hell: techniques need 3 chapters reachable (Prologue counts), accessories 5, Moon of Mahaa-Kalaa 7; Crow /
+  Bat Within Chapter I complete; Earrings of Ruin Chapter XIV complete. Eternal Testimony, Bracelet of Time, Climax
+  Brace (2) and Immortal Marionette (difficulty / medal / Tear conditions) and Tear of Blood: Bad Boy! (touch screen)
+  are EXCLUDED (filler only) and last in logic. Relentless Witchcraft / Survivor of Darkness: two of Chapters VII-X.
+- Client: slot_data include_weapons / include_techniques / include_accessories; a group the seed does not randomize is
+  no longer stripped while connected (it was: bought techniques vanished with include_techniques off).
+- To check in game: which of Chapter I Chest 2 / 5 needs Snake; Chapter V Chest 9 without Crow; Chapter VIII
+  Muspelheim 1 ledge without Crow; Snake Within when Chapter VIII is entered before Chapter V.

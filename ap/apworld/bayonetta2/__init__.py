@@ -3,10 +3,11 @@
 Items, locations and options: Items.py, Locations.py, Options.py. The game's client computes location IDs the same
 way (runtime/ap_game.c). IDs: the 220000 block (Bayonetta 1's world uses 50000).
 """
-from BaseClasses import Item, ItemClassification as IC, Location, Region, Tutorial
+from BaseClasses import Item, ItemClassification as IC, Location, LocationProgressType, Region, Tutorial
 from worlds.AutoWorld import WebWorld, World
+from worlds.generic.Rules import add_rule
 
-from .Items import (CHAPTER_NAMES, CHAPTER_UNLOCKS, CONSUMABLES, HALOS, MACGUFFIN, PIECES, TECHNIQUES, TRAPS,
+from .Items import (ACCESSORIES, CHAPTER_NAMES, CHAPTER_UNLOCKS, CONSUMABLES, HALOS, MACGUFFIN, PIECES, TECHNIQUES, TRAPS,
                     item_name_groups,
                     item_table)
 from .Locations import (BOSS_CHAPTERS, MUSPEL_REGION, RANK_BASE, SHOP_BASE, SHOP_REGION, TEARS,
@@ -108,11 +109,57 @@ class Bayonetta2World(World):
             return lambda s: s.has(MACGUFFIN, p, need) and (not epi or s.can_reach_location(complete[-1], p))
         return lambda s: all(s.can_reach_location(n, p) for n in complete)
 
+    def _rule(self, base: str, rule, exclude: bool = False) -> None:
+        """add rule to the location base and its medal locations ("<base> Rank (...)"), those the seed has"""
+        for loc in self.multiworld.get_locations(self.player):
+            if loc.name == base or loc.name.startswith(base + " Rank ("):
+                add_rule(loc, rule)
+                if exclude:
+                    loc.progress_type = LocationProgressType.EXCLUDED
+
+    def _ability_rules(self) -> None:
+        """What checks need beyond their chapter (ap/research/reports/Bayonetta 2 check requirements.md). Panther and
+        Snake Within, Witch Time and Witch Walk are the game's own, not items."""
+        p, o = self.player, self.options
+        complete = ["%s - Complete" % n for n in CHAPTER_NAMES]
+        # Crow Within (flight). Not randomized: bought in the shop, which sells it after Chapter I.
+        crow = (lambda s: s.has("Crow Within", p)) if o.include_techniques else \
+            (lambda s: s.can_reach_location(complete[1], p))
+        for n in ("Chapter I - Umbran Crow 2", "Chapter XVI - Umbran Crow 1", "Chapter V - Chest 9",
+                  "Gates of Hell: Umbran Spear"):
+            self._rule(n, crow)
+        # Snake Within (underwater), given at the start of Chapter V. Chest 2 or 5 is the Verse 3 alcove heart: both.
+        for n in ("Chapter I - Chest 2", "Chapter I - Chest 5", "Chapter I - Chest 16", "Chapter VIII - Muspelheim 2"):
+            self._rule(n, lambda s: s.can_reach_region("Chapter V", p))
+
+        # Gates of Hell: Halos come from playing, so the price asks for chapters (Prologue + n); the shop sells Crow and
+        # Bat Within after Chapter I, Earrings of Ruin after Chapter XIV.
+        def chapters(k):
+            return lambda s: sum(s.can_reach_region(n, p) for n in CHAPTER_NAMES) >= k
+        for n in TECHNIQUE_LOCATIONS:
+            self._rule("Gates of Hell: %s" % n, chapters(3))
+        for n in ("Crow Within", "Bat Within"):
+            self._rule("Gates of Hell: %s" % n, lambda s: s.can_reach_location(complete[1], p))
+        for n in ACCESSORIES:
+            self._rule("Gates of Hell: %s" % n, chapters(7 if n == "Moon of Mahaa-Kalaa" else 5))
+        self._rule("Gates of Hell: Earrings of Ruin", lambda s: s.can_reach_location(complete[14], p))
+        # sold only after difficulty clears, medals on every chapter or 25 / 50 Tears: filler only, last in logic
+        every = lambda s: all(s.can_reach_location(n, p) for n in complete)
+        for n in ("Eternal Testimony", "Bracelet of Time", "Climax Brace", "Climax Brace 2", "Immortal Marionette"):
+            self._rule("Gates of Hell: %s" % n, every, exclude=True)
+
+        # Tears: demons (from Chapter VII on) for the demon kill counts; Bad Boy! needs a touch screen
+        demons = ["Chapter VII", "Chapter VIII", "Chapter IX", "Chapter X"]
+        for n in ("Relentless Witchcraft", "Survivor of Darkness"):
+            self._rule("Tear of Blood: %s" % n, lambda s: sum(s.can_reach_region(r, p) for r in demons) >= 2)
+        self._rule("Tear of Blood: Bad Boy!", lambda s: True, exclude=True)
+
     def set_rules(self) -> None:
         if self.options.include_tears:                         # a chapter Bewitchment needs those chapters complete
             for k, (title, shown) in TEARS.items():
                 need = ["%s - Complete" % CHAPTER_NAMES[d] for d in shown]
                 self.multiworld.get_location("Tear of Blood: %s" % title, self.player).access_rule =                     lambda s, n=need: all(s.can_reach_location(x, self.player) for x in n)
+        self._ability_rules()
         self.multiworld.get_location("Goal", self.player).access_rule = self._goal_rule()
         self.multiworld.completion_condition[self.player] = lambda s: s.has("Victory", self.player)
 
@@ -157,4 +204,6 @@ class Bayonetta2World(World):
                 "starting_chapter": o.starting_chapter.value, "death_link": bool(o.death_link),
                 "damage_link": bool(o.damage_link), "trap_link": bool(o.trap_link), "ring_link": bool(o.ring_link),
                 "verse_rank_target": o.verse_rank_target.value, "verse_rank_max_medal": o.verse_rank_max_medal.value,
-                "fragments_hunt_requires_final": bool(o.fragments_hunt_requires_epilogue)}
+                "fragments_hunt_requires_final": bool(o.fragments_hunt_requires_epilogue),
+                "include_weapons": bool(o.include_weapons), "include_techniques": bool(o.include_techniques),
+                "include_accessories": bool(o.include_accessories)}
