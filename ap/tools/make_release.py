@@ -1,6 +1,6 @@
 """Makes the Bayonetta 2 Archipelago release from the committed sources (HEAD):
 
-    python ap/tools/make_release.py [--out=<folder>] [--no-zip]
+    python ap/tools/make_release.py [--out=<folder>] [--version=<x.y.z>] [--no-zip]
 
 Writes <out>/Bayonetta2Archipelago/ (default <out> = build_release/ at the top of the project):
   Bayonetta 2 Archipelago.exe   the launcher (installs, plays, uninstalls)
@@ -8,7 +8,7 @@ Writes <out>/Bayonetta2Archipelago/ (default <out> = build_release/ at the top o
                                 (B2recomp/scripts/make_package.py does that part: llvm-mingw, SDL3, Vulkan headers, glslang,
                                 Python with Pillow and lz4, licences; it refuses to finish with any game or build file in it)
   ap/                           the apworld, the tools that make the Archipelago mod from the player's own files, the launcher source
-  README.md, LICENSE
+  README.md, LICENSE, docs/ (the README's pictures)
 and beside it Bayonetta2Archipelago-<version>.zip and bayonetta2.apworld (for the people who only generate).
 Nothing of the game is in it: everything game-derived is made on the player's PC at install.
 """
@@ -67,6 +67,7 @@ def main():
     print('ap: %d files' % n)
     for f in ('README.md', 'LICENSE'):
         shutil.copy2(os.path.join(ROOT, f), os.path.join(REL, f))
+    extract('docs', os.path.join(REL, 'docs'))
 
     exe = os.path.join(REL, 'Bayonetta 2 Archipelago.exe')
     r = subprocess.run([sys.executable, os.path.join(HERE, 'build_launcher.py'), '--out=' + exe], capture_output=True, text=True)
@@ -76,7 +77,8 @@ def main():
 
     subprocess.run([sys.executable, os.path.join(HERE, 'pack_apworld.py'), OUT], check=True)
     with open(os.path.join(AP, 'apworld', 'bayonetta2', 'archipelago.json')) as f:
-        version = json.load(f)['world_version']
+        version = json.load(f)['world_version']          # the release's number: --version, else the apworld's
+    version = next((a[10:] for a in sys.argv[1:] if a.startswith('--version=')), version)
 
     bad = []                                            # nothing of the game, anywhere in it
     for dp, dn, fn in os.walk(REL):
