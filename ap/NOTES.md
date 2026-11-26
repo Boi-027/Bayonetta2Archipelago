@@ -627,3 +627,14 @@ in a scripted run from a Chapter I checkpoint save copy: CONTINUE, then `600:- 2
   no longer stripped while connected (it was: bought techniques vanished with include_techniques off).
 - To check in game: which of Chapter I Chest 2 / 5 needs Snake; Chapter V Chest 9 without Crow; Chapter VIII
   Muspelheim 1 ledge without Crow; Snake Within when Chapter VIII is entered before Chapter V.
+
+## 2026-11-26: Chapter Select after a chapter clear; items held until a stage
+- After a clear (or CONTINUE) the card menu 0x7100b2aa80(menu, chapter) opens on the next chapter. When that
+  chapter's status is 1 (reached, not open) the menu runs the game's "new chapter" step (0x7100b2c430: 0x7100d95f80
+  opens table[card], card count + 1). With the client's table the card is not the new one, so the given cards broke
+  until the menu was built again (a reload). Now 0x7100b2aa80 is wrapped too (ap_patch.py CHAPSEL): a chapter not
+  given opens on the last given chapter before it (ap_game.c ap_chapsel_start). Card left / right = index -1 / +1
+  within the count (0x7100b2bb40). Tested on a copy of the player's save (CONTINUE = Chapter II, not given): opens on
+  Chapter I, cards step through the given chapters only.
+- Halos and consumables are applied only with Bayonetta in a stage: on the title the save object is not yet the slot
+  LOAD GAME picks (the title menu offers slots 1-3), so items given there were lost.

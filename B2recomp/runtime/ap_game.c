@@ -192,6 +192,17 @@ EXPORT int ap_card_index(int i) {
     return c < 18 && !(g_given >> c & 1) ? g_given_n - 1 : i;
 }
 
+/* 0x7100b2aa80(menu, chapter) (scripts/ap_patch.py): the card menu opens on chapter c (CONTINUE's after a clear). One not
+ * given would get the game's "new chapter" step (it opens table[card] and adds a card), which breaks the given cards
+ * until the menu is built again: open on the last given chapter before it instead. */
+EXPORT int ap_chapsel_start(int c) {
+    if (!g_given || c < 0 || c >= 18 || g_given >> c & 1) return c;
+    while (c > 0 && !(g_given >> c & 1)) c--;
+    printf("ap: Chapter Select opens on chapter %d (the one it would open is not given)\n", c);
+    fflush(stdout);
+    return c;
+}
+
 /* the title menu (ap_ui.c ap_menu_frame), twice a second: Chapter Select is built from the save before any stage runs */
 void ap_title_frame(void) {
     static int tick;
@@ -1330,8 +1341,10 @@ static void game_frame(uint64_t save) {
         weapons_frame(save, weapons);
         chapters_given_frame(save);
     }
+    /* Halos and consumables only in a stage: on the title the game's save object is not yet the save LOAD GAME picks
+     * (items given there were lost when it loaded) */
     ApItem got[32];
-    int total, n = ap_net_items(g_applied, got, 32, &total);
+    int total, n = player() ? ap_net_items(g_applied, got, 32, &total) : 0;
     int done = 0;
     while (done < n && apply_spendable(save, got[done].item)) {
         printf("ap: got item %lld (from player %d)\n", (long long)got[done].item, got[done].player);

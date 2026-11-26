@@ -351,6 +351,17 @@ void f_7100b2aca0(Ctx *c) {
     f_7100b2aca0_game(c);
     if (ap_chapsel_card) c->x[0] = (uint32_t)ap_chapsel_card((int)(uint32_t)c->x[0]);
 }
+""", '7100b2aa80': r"""
+__declspec(dllimport) void *__stdcall GetModuleHandleA(const char *);
+__declspec(dllimport) void *__stdcall GetProcAddress(void *, const char *);
+void f_7100b2aa80_game(Ctx *c);
+void f_7100b2aa80(Ctx *c) {               /* the card menu opens on chapter x1: a chapter not given -> a given one */
+    static int (*start)(int);
+    static int looked;
+    if (!looked) { looked = 1; start = (int (*)(int))GetProcAddress(GetModuleHandleA(0), "ap_chapsel_start"); }
+    if (start) c->x[1] = (uint32_t)start((int)(uint32_t)c->x[1]);
+    f_7100b2aa80_game(c);
+}
 """}
 CHAPSEL_MARK = '/* [ap_patch.py] chapsel */'
 CHAPSEL_HEAD = CHAPSEL_MARK + r"""
